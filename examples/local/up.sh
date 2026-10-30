@@ -8,8 +8,10 @@
 # server, a KDC and a CA under systemd, so the containers are privileged.
 # Rootful Podman is simplest: CONTAINER_CONNECTION=podman-machine-default-root
 # on a Mac, or PODMAN="sudo podman" on Linux.
-# The containers keep their own /etc/hosts and /etc/hostname, which the
-# circuit edits; Podman's would be mounted over them. Their addresses go in
+# The containers keep their own /etc/hosts, which the circuit edits; Podman's
+# would be mounted over it. Podman 4 always mounts /etc/hostname, which
+# can't be replaced, so each container starts with the name main.tf gives
+# it and the circuit finds it already set. Their addresses go in
 # ips.auto.tfvars, since the images have no ip command for Conn3x to find
 # them with.
 set -eu
@@ -24,10 +26,10 @@ podman=${PODMAN:-podman}
 [ -f id_ed25519 ] || ssh-keygen -q -t ed25519 -N '' -C "$name" -f id_ed25519
 : > known_hosts
 for role in server client; do
-  if [ "$role" = server ]; then file=$containerfile; p=$port; else file=$client_containerfile; p=$((port + 1)); fi
+  if [ "$role" = server ]; then file=$containerfile; p=$port; fqdn=ipa.example.test; else file=$client_containerfile; p=$((port + 1)); fqdn=client1.example.test; fi
   $podman build -q -f "$file" -t "$name-$role" "$(dirname "$file")" >/dev/null
   $podman rm -f -v "$name-$role" >/dev/null 2>&1 || true
-  $podman run -d --name "$name-$role" --systemd=always --privileged --no-hosts --no-hostname \
+  $podman run -d --name "$name-$role" --systemd=always --privileged --no-hosts --hostname "$fqdn" \
     -p "127.0.0.1:$p:22" "$name-$role" >/dev/null
   $podman exec -i "$name-$role" sh -c 'cat > /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys' < id_ed25519.pub
   $podman exec "$name-$role" timeout 60 systemctl is-system-running --wait >/dev/null 2>&1 || true
