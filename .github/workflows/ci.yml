@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Conn3x
+        env: &gh
+          GH_TOKEN: ${{ github.token }}
+        run: &install |
+          tag=$(gh release view -R conn3xorg/conn3x --json tagName -q .tagName)
+          file="conn3x_${tag#v}_linux_amd64.tar.gz"
+          cd "$RUNNER_TEMP"
+          curl -sSfLO "https://github.com/conn3xorg/conn3x/releases/download/$tag/$file"
+          curl -sSfLO "https://github.com/conn3xorg/conn3x/releases/download/$tag/checksums.txt"
+          grep " $file\$" checksums.txt | sha256sum -c -
+          mkdir -p bin && tar -xzf "$file" -C bin conn3x
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - run: conn3x version
+      - run: conn3x fmt -check -recursive
+      - name: Validate
+        run: conn3x init -backend=false && conn3x validate
+      - name: Validate the example
+        working-directory: examples/local
+        run: conn3x init -backend=false && conn3x validate
+
+  e2e:
+    needs: validate
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # Debian and Ubuntu have no FreeIPA server, so they're clients only.
+        include:
+          - { server: rocky10, client: rocky10 }
+          - { server: fedora45, client: fedora45 }
+          - { server: rocky10, client: ubuntu2404 }
+          - { server: rocky10, client: debian13 }
+    name: e2e (${{ matrix.server }} server, ${{ matrix.client }} client)
+    env:
+      # FreeIPA runs a directory server, a KDC and a CA under systemd, so
+      # the host containers are privileged.
+      PODMAN: sudo podman
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The test host images live in the Conn3x repo.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: conn3xorg/conn3x
+          ref: main
+          path: conn3x
+          persist-credentials: false
+          sparse-checkout: test/images
+      - name: Install Conn3x
+        env: *gh
+        run: *install
+      - name: Start the hosts
+        working-directory: examples/local
+        env:
+          CONTAINERFILE: ${{ github.workspace }}/conn3x/test/images/${{ matrix.server }}/Containerfile
+          CLIENT_CONTAINERFILE: ${{ github.workspace }}/conn3x/test/images/${{ matrix.client }}/Containerfile
+        run: ./up.sh
+      - name: Apply, then plan again with no changes
+        working-directory: examples/local
+        run: |
+          conn3x init
+          conn3x apply -auto-approve
+          conn3x plan -detailed-exitcode
+      - name: Check a user added on the server resolves on the client
+        run: |
+          sudo podman exec -i circuit-freeipa-server sh -eu <<'EOF'
+          echo example-admin-change-me | kinit admin
+          ipa user-add testuser --first Test --last User
+          EOF
+          sudo podman exec -i circuit-freeipa-client sh -eu <<'EOF'
+          for _ in $(seq 30); do
+            id testuser && getent passwd testuser | grep -q '^testuser:' && exit 0
+            sss_cache -E 2>/dev/null || true
+            sleep 2
+          done
+          exit 1
+          EOF
+      - name: Show the install logs
+        if: failure()
+        run: |
+          sudo podman exec circuit-freeipa-server tail -n 100 /var/log/ipaserver-install.log || true
+          sudo podman exec circuit-freeipa-client tail -n 100 /var/log/ipaclient-install.log || true
+      - name: Clean up
+        if: always()
+        working-directory: examples/local
+        run: ./down.sh
