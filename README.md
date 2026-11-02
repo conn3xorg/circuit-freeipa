@@ -1,5 +1,7 @@
 # circuit-freeipa
 
+[![Conn3x grade](https://conn3x.org/circuits/freeipa/grade.svg)](https://conn3x.org/circuits/freeipa/grade)
+
 A Conn3x circuit that installs a FreeIPA server and enrols hosts as its clients, so your users, groups, sudo rules and host keys live in one place and every machine asks it who someone is. One `ipa user-add` and the new person can log in everywhere, with a Kerberos ticket instead of a password typed at every box.
 
 FreeIPA is particular about names. Every host needs a fully qualified name that resolves to its own address, not to loopback, and cloud images tend to get that wrong out of the box. The circuit sets each host's name, writes the matching lines in `/etc/hosts`, stops cloud-init putting them back at boot, and then runs the installers unattended. The admin and Directory Manager passwords reach the hosts without ever landing in the plan, the state, or a command line someone could read in `ps`.
