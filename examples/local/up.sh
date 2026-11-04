@@ -20,7 +20,7 @@ cd "$(dirname "$0")"
 port=${PORT:-2222}
 containerfile=${CONTAINERFILE:-Containerfile}
 client_containerfile=${CLIENT_CONTAINERFILE:-$containerfile}
-name=${NAME:-circuit-freeipa}
+name=${CONTAINER_NAME:-circuit-freeipa}
 
 podman=${PODMAN:-podman}
 [ -f id_ed25519 ] || ssh-keygen -q -t ed25519 -N '' -C "$name" -f id_ed25519
