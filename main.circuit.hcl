@@ -21,7 +21,7 @@ data "conn3x_host" "facts" {
 
     postcondition {
       condition     = !contains(keys(var.server), each.key) || self.os_family == "redhat"
-      error_message = "The server ${each.key} runs ${self.os_id}. The FreeIPA server needs Rocky Linux, AlmaLinux, RHEL, CentOS Stream or Fedora; Debian and Ubuntu ship only the client."
+      error_message = "The server ${each.key} runs ${self.os_id}. The FreeIPA server needs Rocky Linux, AlmaLinux, RHEL or Fedora; Debian and Ubuntu ship only the client."
     }
 
     # ipa-server-install refuses to start with less than 1.2 GB free, and
@@ -53,7 +53,7 @@ locals {
 
   # Fedora names the packages freeipa-*, and the rest of the Red Hat family
   # ipa-*. Debian and Ubuntu have the client only, as freeipa-client.
-  prefix = { for name, o in local.os : name => contains(["rocky", "almalinux", "rhel", "centos"], o) ? "ipa" : "freeipa" }
+  prefix = { for name, o in local.os : name => contains(["rocky", "almalinux", "rhel"], o) ? "ipa" : "freeipa" }
 
   hosts_steps = var.manage_hosts_file ? toset(["on"]) : toset([])
   dns         = var.setup_dns ? toset(["on"]) : toset([])

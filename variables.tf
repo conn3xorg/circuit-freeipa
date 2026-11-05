@@ -8,8 +8,8 @@ variable "server" {
   }
 
   validation {
-    condition     = alltrue([for h in var.server : contains(["rocky", "almalinux", "rhel", "centos", "fedora"], try(h.os, "rocky"))])
-    error_message = "The server's os must be one of rocky, almalinux, rhel, centos or fedora. Debian and Ubuntu ship no FreeIPA server."
+    condition     = alltrue([for h in var.server : contains(["rocky", "almalinux", "rhel", "fedora"], try(h.os, "rocky"))])
+    error_message = "The server's os must be one of rocky, almalinux, rhel or fedora. Debian and Ubuntu ship no FreeIPA server. CentOS Linux reached end of life on 30 June 2024: use Rocky Linux."
   }
 }
 
@@ -24,8 +24,8 @@ variable "clients" {
   }
 
   validation {
-    condition     = alltrue([for h in var.clients : contains(["debian", "ubuntu", "rocky", "almalinux", "rhel", "centos", "fedora"], try(h.os, "rocky"))])
-    error_message = "A client's os must be one of debian, ubuntu, rocky, almalinux, rhel, centos or fedora."
+    condition     = alltrue([for h in var.clients : contains(["debian", "ubuntu", "rocky", "almalinux", "rhel", "fedora"], try(h.os, "rocky"))])
+    error_message = "A client's os must be one of debian, ubuntu, rocky, almalinux, rhel or fedora. CentOS Linux reached end of life on 30 June 2024: use Rocky Linux."
   }
 
   validation {
