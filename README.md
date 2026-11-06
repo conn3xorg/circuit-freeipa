@@ -10,7 +10,7 @@ FreeIPA is particular about names. Every host needs a fully qualified name that 
 
 ```hcl
 module "freeipa" {
-  source = "github.com/conn3xorg/circuit-freeipa?ref=v0.2.0"
+  source = "github.com/conn3xorg/circuit-freeipa?ref=v0.2.1"
 
   server = { ipa = "203.0.113.10" }
   clients = {
