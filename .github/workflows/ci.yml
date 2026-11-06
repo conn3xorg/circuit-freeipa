@@ -105,6 +105,31 @@ jobs:
           done
           exit 1
           EOF
+      # Restarting the server container boots systemd again, so this checks
+      # FreeIPA's services are enabled and come back, the user added before
+      # the restart is still there, and the plan has nothing to do.
+      - name: Restart the server, then check the user and the plan again
+        working-directory: examples/local
+        run: |
+          sudo podman restart circuit-freeipa-server
+          for _ in $(seq 300); do
+            sudo podman exec circuit-freeipa-server ipactl status >/dev/null 2>&1 && break
+            sleep 2
+          done
+          sudo podman exec -i circuit-freeipa-server sh -eu <<'EOF'
+          ipactl status
+          echo example-admin-change-me | kinit admin
+          ipa user-show testuser | grep -q 'User login: testuser'
+          EOF
+          sudo podman exec -i circuit-freeipa-client sh -eu <<'EOF'
+          for _ in $(seq 30); do
+            sss_cache -E 2>/dev/null || true
+            id testuser && exit 0
+            sleep 2
+          done
+          exit 1
+          EOF
+          conn3x plan -detailed-exitcode
       - name: Show the install logs
         if: failure()
         run: |
