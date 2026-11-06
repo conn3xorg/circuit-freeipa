@@ -105,17 +105,16 @@ jobs:
           done
           exit 1
           EOF
-      # Restarting the server container boots systemd again, so this checks
-      # FreeIPA's services are enabled and come back, the user added before
-      # the restart is still there, and the plan has nothing to do.
-      - name: Restart the server, then check the user and the plan again
+      # ipactl restart stops and starts every FreeIPA service on the server:
+      # the directory, the KDC, the CA and the web API. The user added before
+      # it has to still be there and resolve on the client, and the plan has
+      # to have nothing to do. The container itself isn't restarted: when
+      # CI tried that, the step was still waiting on it after 20 minutes.
+      - name: Restart FreeIPA on the server, then check the user and the plan again
         working-directory: examples/local
+        timeout-minutes: 15
         run: |
-          sudo podman restart circuit-freeipa-server
-          for _ in $(seq 300); do
-            sudo podman exec circuit-freeipa-server ipactl status >/dev/null 2>&1 && break
-            sleep 2
-          done
+          sudo podman exec circuit-freeipa-server timeout 600 ipactl restart
           sudo podman exec -i circuit-freeipa-server sh -eu <<'EOF'
           ipactl status
           echo example-admin-change-me | kinit admin
